@@ -1,9 +1,16 @@
 import { Telegraf } from 'telegraf';
 const BOT_TOKEN = "6290000446:AAGRZEgD9Y2nXObUOcnTtQ6v5K1se7RarWc";
-import { NotionAPI } from 'notion-client'
-const projects = [];
+import { NotionAPI } from 'notion-client';
 const bot = new Telegraf(BOT_TOKEN);
 const api = new NotionAPI();
+
+const statuses = {
+    "🔴": ["не тронут", "не тронуто", "нет прогресса", "ничего не сделано"],
+    "🟠": ["есть наработки", "есть какой-то дизайн"],
+    "🟡": ["в разработке"],
+    "🟢": ["готово но prod ли?", "почти готово", "готово, но не тестировано!"],
+    "⚫️": ["анреал"]
+}
 
 //const cron = require('node-cron');
 
@@ -11,131 +18,72 @@ const api = new NotionAPI();
 
 //const { BOT_TOKEN, CHAT_ID } = process.env.BOT_TOKEN;
 
+function getRandomInt(max) {
+    return Math.floor(Math.random() * max);
+}
 
 bot.start((ctx) => ctx.reply('Zahar lox!'));
-bot.hears('/getprojects', async (ctx) => {
-    const page = await api.getPage('projects-todo-68d4b5c3bccd4d25a26fb791423c071c');
-    const data = Object.keys(page.block)
-        .map((key) => page.block[key])
+bot.hears('/getproject', async (ctx) => {
+    const homePage = await api.getPage('projects-todo-68d4b5c3bccd4d25a26fb791423c071c');
+    const homeData = Object.keys(homePage.block)
+        .map((key) => homePage.block[key])
         .filter((x) => x.value.type === "page")
         .map((x) => x.value.properties)
         .map((x) => x.title)
-    const regExp = /\(.+\)./;
-    const regExp2 = /(?<=\()[^)]+(?=\))/g;
-
-    for (let i = 1; i < data.length; i++) {
-        const title = data[i][0][0].replace(regExp, '');
-        let status = '';
-        console.log(data[i][0][0].replace(regExp, ''));
-        if (regExp.test(data[i][0][0])) {
-            console.log(data[i][0][0].match(regExp2));
-            status = data[i][0][0].match(regExp2)[0];
+    const projectsId = Object.keys(homePage.block)
+        .map((key) => homePage.block[key])
+        .filter((x) => x.value.type === "page")
+        .map((x) => x.value.id)
+    const regExpBrackets = /\(.+\)./;
+    const regExpWords = /(?<=\()[^)]+(?=\))/g;
+    const regExpUrl = /[A-Za-z]/g;
+    const randomProject = getRandomInt(homeData.length);
+    const projects = [];
+    for (let i = 1; i < homeData.length; i++) {
+        let str = '';
+        if (homeData[i].length === 1) {
+            str += homeData[i][0];
+        } else {
+            for (let y = 0; y < homeData[i].length; y++) {
+                str += homeData[i][y][0];
+            }
         }
-        ctx.reply(`${title} - ${status}`);
+        projects.push(str);
     }
+    const project = projects[randomProject];
+    let title = project.replace(regExpBrackets, '');
+    let status = '';
+    let status_emoji = '';
+    if (regExpBrackets.test(project)) {
+        status = project.match(regExpWords)[0];
+    }
+    for (const emoji in statuses) {
+        for (const key in statuses[emoji]) {
+            if (statuses[emoji][key] === status) {
+                status_emoji = emoji;
+            }
+        }
+    }
+    let projectUrl = projectsId[randomProject+1];
+    projectUrl = projectUrl.split('-').join('');
+    console.log(projectUrl);
+    const chatId = "-1001792494229";
+    title = title[0].toUpperCase() + title.slice(1);
+    if (status !== '') {
+        status = status[0]?.toUpperCase() + status?.slice(1);
+    }
+    console.log(status)
+    ctx.reply(`${title}${status ? " - " + status_emoji + " " + status + (status[status.length-1] === '!' || status[status.length-1] === '?' ? '' : '.') : '.'} ${status_emoji === "🟢" ? 'Ты можешь помочь закончить!' : 'Всегда стоит попробовать!'}`, {
+        reply_markup: {
+            inline_keyboard: [
+                [
+                    {
+                        text: 'Open this project',
+                        url: `https://shpp.notion.site/${projectUrl}`
+                    }
+                ]
+            ]
+        }
+    })
 });
 bot.launch();
-
-/*bot.hears('/getnotactive', (ctx) => {
-    ctx.reply(messageByNotActiveUser(users));
-})
-
-bot.hears('/getallactive', (ctx) => {
-    ctx.reply(messageAllActiveUser(users));
-})
-
-bot.on('message',  (ctx) => {
-    usersMessage.push(ctx.message.from.username);
-})*/
-
-/*const usersMessage = [];
-
-function messageCounterByUser(users) {
-    let resultActive = {};
-    let message = '';
-
-    users.forEach((a) => {
-        if (resultActive[a] !== undefined) {
-            ++resultActive[a];
-        }
-        else {
-            resultActive[a] = 1;
-        }
-    });
-
-    resultActive = Object.entries(resultActive)
-        .sort(([,a],[,b]) => b-a)
-        .reduce((r, [k, v]) => ({ ...r, [k]: v }), {});
-
-    for (const key in resultActive) {
-        message += `${key} - ${resultActive[key]} сообщения(е)\n`;
-    }
-    return message;
-}
-
-function messageByNotActiveUser(usersAll) {
-    const usersNotActive = usersAll.filter(el => !usersMessage.includes(el));
-    let resultNotActive = {};
-    let message = '';
-
-    usersNotActive.forEach((a) => {
-        ++resultNotActive[a];
-    });
-
-    for (const key in resultNotActive) {
-        message += `${key}, `;
-    }
-    return message + 'были не активными, ребята, давайте активничайте';
-}
-
-function messageAllActiveUser(usersAll) {
-    const usersNotActive = usersAll.filter(el => !usersMessage.includes(el));
-    let resultNotActiveAll = {};
-    let resultActiveAll = {};
-    let message = '';
-
-    usersNotActive.forEach((a) => {
-        resultNotActiveAll[a] = 0;
-    });
-
-    users.forEach((a) => {
-        if (resultActiveAll[a] !== undefined) {
-            ++resultActiveAll[a];
-        } else {
-            resultActiveAll[a] = 1;
-        }
-    });
-
-    let result = { ...resultActiveAll, ...resultNotActiveAll };
-
-    result = Object.entries(result)
-        .sort(([,a],[,b]) => b-a)
-        .reduce((r, [k, v]) => ({ ...r, [k]: v }), {});
-
-    for (const key in result) {
-        message += `${key} - ${result[key]} сообщения(е)\n`;
-    }
-    return message;
-}
-
-bot.hears('/getstat', (ctx) => {
-    ctx.reply(messageCounterByUser(usersMessage));
-})
-
-bot.hears('/getnotactive', (ctx) => {
-    ctx.reply(messageByNotActiveUser(users));
-})
-
-bot.hears('/getallactive', (ctx) => {
-    ctx.reply(messageAllActiveUser(users));
-})
-
-bot.on('message',  (ctx) => {
-    usersMessage.push(ctx.message.from.username);
-})
-
-cron.schedule('* 9 * * 1', () => {
-    bot.telegram.sendMessage(CHAT_ID, messageCounterByUser(usersMessage))
-});
-*
-bot.launch();*/
