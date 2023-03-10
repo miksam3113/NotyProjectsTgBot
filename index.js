@@ -119,7 +119,7 @@ bot.hears(['/getproject', '/getproject@todoprojects_bot'], (ctx) => {
     })
 });
 
-cron.schedule('* 10 * * 1', () => {
+cron.schedule('5 * * * * *', () => {
     getProject().then(data => {
         const [textMassage, configMassage] = data;
         bot.telegram.sendMessage(CHAT_ID, textMassage, configMassage)
