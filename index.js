@@ -116,7 +116,8 @@ bot.hears(['/getproject', '/getproject@todoprojects_bot'], (ctx) => {
     getProject().then(data => {
         const [textMassage, configMassage] = data;
         //ctx.reply(textMassage, configMassage);
-        bot.telegram.sendMessage(CHAT_ID, textMassage, configMassage)
+        console.log(CHAT_ID)
+        bot.telegram.sendMessage(CHAT_ID, CHAT_ID, configMassage)
     })
 });
 
