@@ -1,8 +1,22 @@
 import { Telegraf } from 'telegraf';
-const BOT_TOKEN = "6290000446:AAGRZEgD9Y2nXObUOcnTtQ6v5K1se7RarWc";
 import { NotionAPI } from 'notion-client';
-const bot = new Telegraf(BOT_TOKEN);
+import * as dotenv from 'dotenv';
+import cron from 'node-cron';
+dotenv.config();
+const { BOT_TOKEN, HOME_PAGE_API, URL_SITE, CHAT_ID } = process.env;
 const api = new NotionAPI();
+const bot = new Telegraf(BOT_TOKEN);
+
+bot.telegram.setMyCommands([
+    {
+        command: "/start",
+        description: "start bot"
+    },
+    {
+        command: "/getproject",
+        description: "get random project"
+    },
+]);
 
 const statuses = {
     "🔴": ["не тронут", "не тронуто", "нет прогресса", "ничего не сделано"],
@@ -10,35 +24,58 @@ const statuses = {
     "🟡": ["в разработке"],
     "🟢": ["готово но prod ли?", "почти готово", "готово, но не тестировано!"],
     "⚫️": ["анреал"]
-}
+};
 
-//const cron = require('node-cron');
+const configMassage = (projectUrl) => (
+    {
+        reply_markup: {
+            inline_keyboard: [
+                [
+                    {
+                        text: 'Open this project',
+                        url: `${URL_SITE}${projectUrl}`
+                    }
+                ]
+            ]
+        }
+    }
+);
 
-//require('dotenv').config()
-
-//const { BOT_TOKEN, CHAT_ID } = process.env.BOT_TOKEN;
+const regExpBrackets = /\(.+\)./;
+const regExpWords = /(?<=\()[^)]+(?=\))/g;
 
 function getRandomInt(max) {
     return Math.floor(Math.random() * max);
 }
 
-bot.start((ctx) => ctx.reply('Zahar lox!'));
-bot.hears('/getproject', async (ctx) => {
-    const homePage = await api.getPage('projects-todo-68d4b5c3bccd4d25a26fb791423c071c');
+function createMassage (title, status, status_emoji) {
+    return (
+        `${title}${
+            status ?
+                ` - ${status_emoji} ${status}${status[status.length-1] === '!' || status[status.length-1] === '?' ?
+                    ''
+                    : '.'}`
+                : '.'} ${status_emoji === "🟢" ?
+                            'Ты можешь помочь закончить!'
+                                : 'Всегда стоит попробовать!'}`
+    );
+}
+
+async function getProject () {
+    const homePage = await api.getPage(HOME_PAGE_API);
     const homeData = Object.keys(homePage.block)
         .map((key) => homePage.block[key])
         .filter((x) => x.value.type === "page")
         .map((x) => x.value.properties)
-        .map((x) => x.title)
+        .map((x) => x.title);
     const projectsId = Object.keys(homePage.block)
         .map((key) => homePage.block[key])
         .filter((x) => x.value.type === "page")
-        .map((x) => x.value.id)
-    const regExpBrackets = /\(.+\)./;
-    const regExpWords = /(?<=\()[^)]+(?=\))/g;
-    const regExpUrl = /[A-Za-z]/g;
+        .map((x) => x.value.id);
     const randomProject = getRandomInt(homeData.length);
     const projects = [];
+
+    // Fill array title of projects
     for (let i = 1; i < homeData.length; i++) {
         let str = '';
         if (homeData[i].length === 1) {
@@ -64,26 +101,29 @@ bot.hears('/getproject', async (ctx) => {
             }
         }
     }
-    let projectUrl = projectsId[randomProject+1];
+    let projectUrl = projectsId[randomProject + 1];
     projectUrl = projectUrl.split('-').join('');
-    console.log(projectUrl);
-    const chatId = "-1001792494229";
     title = title[0].toUpperCase() + title.slice(1);
     if (status !== '') {
         status = status[0]?.toUpperCase() + status?.slice(1);
     }
-    console.log(status)
-    ctx.reply(`${title}${status ? " - " + status_emoji + " " + status + (status[status.length-1] === '!' || status[status.length-1] === '?' ? '' : '.') : '.'} ${status_emoji === "🟢" ? 'Ты можешь помочь закончить!' : 'Всегда стоит попробовать!'}`, {
-        reply_markup: {
-            inline_keyboard: [
-                [
-                    {
-                        text: 'Open this project',
-                        url: `https://shpp.notion.site/${projectUrl}`
-                    }
-                ]
-            ]
-        }
+    return [createMassage(title, status, status_emoji), configMassage(projectUrl)];
+}
+
+bot.start((ctx) => ctx.replyWithMarkdown('Hello, this bot sends projects that will be useful for ш++. You can call me by sending to the chat ``/getproject``. This bot will send random project every Monday at 10 am.'));
+
+bot.hears(['/getproject', '/getproject@todoprojects_bot'], (ctx) => {
+    getProject().then(data => {
+        const [textMassage, configMassage] = data;
+        ctx.reply(textMassage, configMassage);
     })
 });
+
+cron.schedule('* 10 * * 1', () => {
+    getProject().then(data => {
+        const [textMassage, configMassage] = data;
+        bot.telegram.sendMessage(CHAT_ID, textMassage, configMassage)
+    })
+});
+
 bot.launch();
