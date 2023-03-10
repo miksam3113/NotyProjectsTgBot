@@ -115,7 +115,8 @@ bot.start((ctx) => ctx.replyWithMarkdown('Hello, this bot sends projects that wi
 bot.hears(['/getproject', '/getproject@todoprojects_bot'], (ctx) => {
     getProject().then(data => {
         const [textMassage, configMassage] = data;
-        ctx.reply(textMassage, configMassage);
+        //ctx.reply(textMassage, configMassage);
+        bot.telegram.sendMessage(CHAT_ID, textMassage, configMassage)
     })
 });
 
