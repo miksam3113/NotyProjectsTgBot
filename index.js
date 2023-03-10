@@ -50,14 +50,7 @@ function getRandomInt(max) {
 
 function createMassage (title, status, status_emoji) {
     return (
-        `${title}${
-            status ?
-                ` - ${status_emoji} ${status}${status[status.length-1] === '!' || status[status.length-1] === '?' ?
-                    ''
-                    : '.'}`
-                : '.'} ${status_emoji === "🟢" ?
-                            'Ты можешь помочь закончить!'
-                                : 'Всегда стоит попробовать!'}`
+        `${title}${status ? ` - ${status_emoji} ${status}${status[status.length-1] === '!' || status[status.length-1] === '?' ? '' : '.'}` : '.'} ${status_emoji === "🟢" ? 'Ты можешь помочь закончить!' : 'Всегда стоит попробовать!'}`
     );
 }
 
